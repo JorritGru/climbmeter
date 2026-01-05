@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Professional climbing force meter app - Compatible with DIY and commercial devices">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>ClimbMeter Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #6b7280;
+            --border: rgba(255, 255, 255, 0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+            padding-bottom: 70px;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .app-title {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Content */
+        .content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-value {
+            font-size: 48px;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .card-unit {
+            font-size: 20px;
+            opacity: 0.8;
+            margin-left: 8px;
+        }
+
+        /* Force Display */
+        .force-display {
+            text-align: center;
+            padding: 40px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .force-display canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        .force-value {
+            font-size: 96px;
+            font-weight: bold;
+            line-height: 1;
+            transition: transform 0.1s;
+            position: relative;
+            z-index: 1;
+        }
+
+        .force-value.pulse {
+            animation: scaleUp 0.3s;
+        }
+
+        @keyframes scaleUp {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        /* Chart */
+        .chart-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            height: 200px;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-primary {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-primary.connected {
+            background: var(--danger);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        /* Test Mode Cards */
+        .test-modes {
+            display: grid;
+            gap: 15px;
+        }
+
+        .test-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .test-card:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .test-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .test-card-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .test-card-icon {
+            font-size: 32px;
+        }
+
+        .test-card-desc {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        /* Session Cards */
+        .session-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .session-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid var(--border);
+        }
+
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .session-date {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .session-type {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .session-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.7;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state-text {
+            font-size: 18px;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .nav-item.active {
+            color: white;
+        }
+
+        .nav-icon {
+            font-size: 24px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+        }
+
+        /* Test Running State */
+        .test-running {
+            text-align: center;
+        }
+
+        .timer-display {
+            font-size: 72px;
+            font-weight: bold;
+            margin: 30px 0;
+        }
+
+        .rep-counter {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .instruction {
+            font-size: 24px;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+        }
+
+        /* Audio Indicator */
+        .audio-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+            animation: slideIn 0.3s;
+            z-index: 200;
+        }
+
+        .audio-indicator.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .test-modes {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Install Prompt */
+        .install-prompt {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .install-prompt.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="app-title">
+                🧗 ClimbMeter Pro
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install Prompt -->
+    <div class="install-prompt" id="installPrompt">
+        <strong>📱 Install App</strong>
+        <p style="margin: 8px 0 12px 0; font-size: 14px;">Install ClimbMeter Pro for quick access and offline use!</p>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="installApp()" style="flex: 1;">Install</button>
+            <button class="btn btn-outline" onclick="dismissInstall()" style="flex: 0 0 auto; padding: 16px 24px;">Later</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        <!-- Live Tab -->
+        <div id="liveTab" class="tab-content active">
+            <div class="card force-display" id="forceCard">
+                <canvas id="backgroundChart"></canvas>
+                <div class="force-value" id="forceValue">0.0</div>
+                <div class="card-unit">kg</div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">PEAK</div>
+                    <div class="stat-value" id="peakValue">0.0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">RFD</div>
+                    <div class="stat-value" id="rfdValue">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">BATTERY</div>
+                    <div class="stat-value" id="batteryValue">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">WEIGHT RATIO</div>
+                    <div class="stat-value" id="ratioValue">--</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="forceChart"></canvas>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="connectBtn" onclick="toggleConnection()">
+                    🔌 Connect Device
+                </button>
+                <button class="btn btn-secondary" id="resetBtn" onclick="resetPeak()" disabled>
+                    🔄 Reset Peak
+                </button>
+                <button class="btn btn-secondary" id="tareBtn" onclick="tare()" disabled>
+                    ⚖️ Tare (Zero)
+                </button>
+            </div>
+        </div>
+
+        <!-- Tests Tab -->
+        <div id="testsTab" class="tab-content">
+            <div class="test-modes">
+                <div class="test-card" onclick="startTest('peak')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">Peak Force</div>
+                        <div class="test-card-icon">💪</div>
+                    </div>
+                    <div class="test-card-desc">Maximum strength test with countdown</div>
+                </div>
+
+                <div class="test-card" onclick="startTest('endurance')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">Endurance</div>
+                        <div class="test-card-icon">⏱️</div>
+                    </div>
+                    <div class="test-card-desc">Hold for time (7-120 seconds)</div>
+                </div>
+
+                <div class="test-card" onclick="startTest('repeaters')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">Repeaters</div>
+                        <div class="test-card-icon">🔁</div>
+                    </div>
+                    <div class="test-card-desc">7s on / 3s off protocol with audio cues</div>
+                </div>
+
+                <div class="test-card" onclick="startTest('rfd')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">RFD Test</div>
+                        <div class="test-card-icon">⚡</div>
+                    </div>
+                    <div class="test-card-desc">Rate of force development (explosive power)</div>
+                </div>
+
+                <div class="test-card" onclick="startTest('critical')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">Critical Force</div>
+                        <div class="test-card-icon">📊</div>
+                    </div>
+                    <div class="test-card-desc">Aerobic capacity assessment</div>
+                </div>
+
+                <div class="test-card" onclick="startTest('failure')">
+                    <div class="test-card-header">
+                        <div class="test-card-title">To Failure</div>
+                        <div class="test-card-icon">🔥</div>
+                    </div>
+                    <div class="test-card-desc">Hold until you can't anymore</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Routines Tab -->
+        <div id="routinesTab" class="tab-content">
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="showRoutineModal()">
+                    ➕ Create Routine
+                </button>
+            </div>
+
+            <div id="routineList" class="session-list">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <div class="empty-state-text">No custom routines yet</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="historyTab" class="tab-content">
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="exportCSV()">
+                    📥 Export CSV
+                </button>
+                <button class="btn btn-outline" onclick="clearHistory()">
+                    🗑️ Clear History
+                </button>
+            </div>
+
+            <div id="sessionList" class="session-list">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <div class="empty-state-text">No sessions yet. Start training!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="statsTab" class="tab-content">
+            <div class="card">
+                <div class="card-title">Training Streak</div>
+                <div style="text-align: center; padding: 20px 0;">
+                    <div style="font-size: 72px;">🔥</div>
+                    <div class="card-value" id="streakValue">0</div>
+                    <div class="card-unit">days</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">ALL-TIME PEAK</div>
+                    <div class="stat-value" id="allTimePeak">0.0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">TOTAL SESSIONS</div>
+                    <div class="stat-value" id="totalSessions">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">THIS WEEK</div>
+                    <div class="stat-value" id="weekSessions">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">AVG PEAK</div>
+                    <div class="stat-value" id="avgPeak">0.0</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Settings</div>
+                <div class="form-group">
+                    <label class="form-label">Body Weight (kg)</label>
+                    <input type="number" class="form-input" id="bodyWeight" placeholder="70" onchange="saveSettings()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Audio Cues</label>
+                    <select class="form-select" id="audioEnabled" onchange="saveSettings()">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Auto-Start Threshold (kg)</label>
+                    <input type="number" class="form-input" id="autoStartThreshold" value="2" onchange="saveSettings()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Modal -->
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="testModalTitle">Peak Force Test</div>
+                <button class="close-btn" onclick="closeTestModal()">×</button>
+            </div>
+
+            <div id="testConfig">
+                <div class="form-group">
+                    <label class="form-label">Duration (seconds)</label>
+                    <input type="number" class="form-input" id="testDuration" value="7">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reps</label>
+                    <input type="number" class="form-input" id="testReps" value="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rest Between Reps (seconds)</label>
+                    <input type="number" class="form-input" id="testRest" value="3">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hand</label>
+                    <select class="form-select" id="testHand">
+                        <option value="both">Both Hands (L then R per rep)</option>
+                        <option value="left">Left Hand Only</option>
+                        <option value="right">Right Hand Only</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="runTest()">Start Test</button>
+            </div>
+
+            <div id="testRunning" style="display: none;">
+                <div class="test-running">
+                    <div class="instruction" id="testInstruction">Get Ready...</div>
+                    <div class="timer-display" id="testTimer">0:00</div>
+                    <div id="handIndicator" style="font-size: 48px; margin: 10px 0; display: none;">
+                        👈 LEFT | RIGHT 👉
+                    </div>
+                    <div class="rep-counter" id="repCounter">Rep 1 / 1</div>
+                    
+                    <div class="force-display">
+                        <div class="force-value" id="testForceValue">0.0</div>
+                        <div class="card-unit">kg</div>
+                    </div>
+
+                    <div class="stats-grid" style="margin: 20px 0;">
+                        <div class="stat-card">
+                            <div class="stat-label">PEAK THIS REP</div>
+                            <div class="stat-value" id="testPeakValue">0.0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">BEST PEAK</div>
+                            <div class="stat-value" id="testBestPeak">0.0</div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-danger" onclick="stopTest()">Stop Test</button>
+                </div>
+            </div>
+
+            <div id="testResults" style="display: none;">
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                    <div style="font-size: 24px; margin-bottom: 30px;">Test Complete!</div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">BEST PEAK</div>
+                            <div class="stat-value" id="resultPeak">0.0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">AVG FORCE</div>
+                            <div class="stat-value" id="resultAvg">0.0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">TOTAL TIME</div>
+                            <div class="stat-value" id="resultTime">0s</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">REPS</div>
+                            <div class="stat-value" id="resultReps">0</div>
+                        </div>
+                    </div>
+
+                    <div class="btn-group" style="margin-top: 30px;">
+                        <button class="btn btn-primary" onclick="runTest()">Run Again</button>
+                        <button class="btn btn-secondary" onclick="closeTestModal()">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routine Modal -->
+    <div id="routineModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Create Routine</div>
+                <button class="close-btn" onclick="closeRoutineModal()">×</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Routine Name</label>
+                <input type="text" class="form-input" id="routineName" placeholder="My Training Routine">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Template</label>
+                <select class="form-select" id="routineTemplate" onchange="loadTemplate()">
+                    <option value="">Custom</option>
+                    <option value="beginner">Beginner (3x7s repeaters)</option>
+                    <option value="intermediate">Intermediate (5x7s repeaters)</option>
+                    <option value="advanced">Advanced (7x7s repeaters)</option>
+                    <option value="endurance">Endurance (3x30s holds)</option>
+                </select>
+            </div>
+
+            <div id="routineExercises">
+                <!-- Exercises will be added here -->
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="addExercise()">+ Add Exercise</button>
+                <button class="btn btn-primary" onclick="saveRoutine()">Save Routine</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Indicator -->
+    <div id="audioIndicator" class="audio-indicator">
+        🔊 Audio Cue
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('live')">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Live</div>
+        </button>
+        <button class="nav-item" onclick="switchTab('tests')">
+            <div class="nav-icon">🎯</div>
+            <div class="nav-label">Tests</div>
+        </button>
+        <button class="nav-item" onclick="switchTab('routines')">
+            <div class="nav-icon">📋</div>
+            <div class="nav-label">Routines</div>
+        </button>
+        <button class="nav-item" onclick="switchTab('history')">
+            <div class="nav-icon">📈</div>
+            <div class="nav-label">History</div>
+        </button>
+        <button class="nav-item" onclick="switchTab('stats')">
+            <div class="nav-icon">🏆</div>
+            <div class="nav-label">Stats</div>
+        </button>
+    </div>
+
+    <script>
+        // ========================================
+        // GLOBAL STATE
+        // ========================================
+        const STATE = {
+            device: null,
+            characteristic: null,
+            isConnected: false,
+            currentForce: 0,
+            peakForce: 0,
+            rfd: 0,
+            batteryVoltage: 0,
+            batteryPercent: 0,
+            forceHistory: [],
+            maxHistory: 160, // 2 seconds at 80Hz
+            audioEnabled: true,
+            autoStartThreshold: 2,
+            bodyWeight: 70,
+            testState: null,
+            sessions: [],
+            routines: []
+        };
+
+        // BLE Configuration
+        const BLE_CONFIG = {
+            SERVICE_UUID: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+            CHARACTERISTIC_UUID: '6e400002-b5a3-f393-e0a9-e50e24dcca9e'
+        };
+
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadSessions();
+            loadRoutines();
+            updateStats();
+            initChart();
+            checkInstallPrompt();
+            
+            // Check if previously connected
+            const lastDevice = localStorage.getItem('lastDevice');
+            if (lastDevice) {
+                console.log('Previous device found:', lastDevice);
+            }
+        });
+
+        // ========================================
+        // BLE FUNCTIONS
+        // ========================================
+        async function toggleConnection() {
+            if (STATE.isConnected) {
+                disconnect();
+            } else {
+                await connect();
+            }
+        }
+
+        async function connect() {
+            try {
+                console.log('🔍 Requesting device...');
+                
+                STATE.device = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { name: 'ClimbMeter' },
+                        { name: 'Progressor' }
+                    ],
+                    optionalServices: [BLE_CONFIG.SERVICE_UUID]
+                });
+
+                console.log('✅ Device selected:', STATE.device.name);
+                localStorage.setItem('lastDevice', STATE.device.name);
+
+                const server = await STATE.device.gatt.connect();
+                console.log('✅ GATT connected');
+
+                const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
+                console.log('✅ Service found');
+
+                STATE.characteristic = await service.getCharacteristic(BLE_CONFIG.CHARACTERISTIC_UUID);
+                console.log('✅ Characteristic found');
+
+                await STATE.characteristic.startNotifications();
+                STATE.characteristic.addEventListener('characteristicvaluechanged', handleForceData);
+                STATE.device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                updateConnectionStatus(true);
+                playBeep(800, 100);
+                
+            } catch (error) {
+                console.error('❌ Connection failed:', error);
+                alert('Failed to connect: ' + error.message);
+            }
+        }
+
+        function disconnect() {
+            if (STATE.device && STATE.device.gatt.connected) {
+                STATE.device.gatt.disconnect();
+            }
+            updateConnectionStatus(false);
+        }
+
+        function onDisconnected() {
+            console.log('Device disconnected');
+            updateConnectionStatus(false);
+            playBeep(400, 200);
+        }
+
+        function handleForceData(event) {
+            const value = event.target.value;
+            const dataView = new DataView(value.buffer);
+            
+            // Parse force data (4 bytes float each)
+            STATE.currentForce = dataView.getFloat32(0, true);
+            STATE.peakForce = dataView.getFloat32(4, true);
+            
+            // Parse battery if available (16 byte packet)
+            if (value.byteLength >= 16) {
+                STATE.batteryVoltage = dataView.getFloat32(8, true);
+                STATE.batteryPercent = dataView.getFloat32(12, true);
+            }
+
+            // Calculate RFD (simplified)
+            if (STATE.forceHistory.length > 0) {
+                const timeDelta = 0.0125; // 80Hz = 12.5ms
+                const forceDelta = STATE.currentForce - STATE.forceHistory[STATE.forceHistory.length - 1];
+                STATE.rfd = Math.max(0, Math.round(forceDelta / timeDelta));
+            }
+
+            updateDisplay();
+
+            // Add to history
+            STATE.forceHistory.push(STATE.currentForce);
+            if (STATE.forceHistory.length > STATE.maxHistory) {
+                STATE.forceHistory.shift();
+            }
+
+            // If test is running, update test display
+            if (STATE.testState && STATE.testState.isRunning) {
+                updateTestDisplay();
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            STATE.isConnected = connected;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const tareBtn = document.getElementById('tareBtn');
+
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                connectBtn.innerHTML = '🔌 Disconnect';
+                connectBtn.classList.add('connected');
+                resetBtn.disabled = false;
+                tareBtn.disabled = false;
+                startChart();
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+                connectBtn.innerHTML = '🔌 Connect Device';
+                connectBtn.classList.remove('connected');
+                resetBtn.disabled = true;
+                tareBtn.disabled = true;
+                stopChart();
+                
+                STATE.currentForce = 0;
+                STATE.peakForce = 0;
+                STATE.forceHistory = [];
+                updateDisplay();
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('forceValue').textContent = STATE.currentForce.toFixed(1);
+            document.getElementById('peakValue').textContent = STATE.peakForce.toFixed(1);
+            document.getElementById('rfdValue').textContent = STATE.rfd;
+            
+            // Battery
+            if (STATE.batteryVoltage > 0) {
+                document.getElementById('batteryValue').textContent = 
+                    STATE.batteryVoltage.toFixed(1) + 'V';
+            }
+            
+            // Weight ratio
+            if (STATE.bodyWeight > 0 && STATE.peakForce > 0) {
+                const ratio = (STATE.peakForce / STATE.bodyWeight).toFixed(2);
+                document.getElementById('ratioValue').textContent = ratio + 'x';
+            }
+
+            // Pulse effect on high force
+            if (STATE.currentForce > STATE.peakForce * 0.9) {
+                document.getElementById('forceValue').classList.add('pulse');
+                setTimeout(() => {
+                    document.getElementById('forceValue').classList.remove('pulse');
+                }, 300);
+            }
+        }
+
+        function resetPeak() {
+            STATE.peakForce = 0;
+            updateDisplay();
+            playBeep(1000, 50);
+        }
+
+        function tare() {
+            // In real implementation, send tare command to device
+            playBeep(1200, 100);
+            alert('Tare function - would send command to device');
+        }
+
+        // ========================================
+        // CHART
+        // ========================================
+        let chartAnimationFrame;
+        let backgroundChartFrame;
+        const canvas = document.getElementById('forceChart');
+        const ctx = canvas.getContext('2d');
+        const bgCanvas = document.getElementById('backgroundChart');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        function initChart() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            // Background canvas
+            const bgContainer = bgCanvas.parentElement;
+            bgCanvas.width = bgContainer.clientWidth;
+            bgCanvas.height = bgContainer.clientHeight;
+        }
+
+        function startChart() {
+            if (!chartAnimationFrame) {
+                chartAnimationFrame = requestAnimationFrame(drawChart);
+            }
+            if (!backgroundChartFrame) {
+                backgroundChartFrame = requestAnimationFrame(drawBackgroundChart);
+            }
+        }
+
+        function stopChart() {
+            if (chartAnimationFrame) {
+                cancelAnimationFrame(chartAnimationFrame);
+                chartAnimationFrame = null;
+            }
+            if (backgroundChartFrame) {
+                cancelAnimationFrame(backgroundChartFrame);
+                backgroundChartFrame = null;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        }
+
+        function drawBackgroundChart() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+            if (STATE.forceHistory.length < 2) {
+                backgroundChartFrame = requestAnimationFrame(drawBackgroundChart);
+                return;
+            }
+
+            const maxValue = Math.max(...STATE.forceHistory, 10);
+
+            // Draw filled area under curve
+            bgCtx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+            bgCtx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+            bgCtx.lineWidth = 2;
+            bgCtx.lineCap = 'round';
+            bgCtx.lineJoin = 'round';
+
+            bgCtx.beginPath();
+            bgCtx.moveTo(0, bgCanvas.height);
+            
+            STATE.forceHistory.forEach((force, index) => {
+                const x = (bgCanvas.width / STATE.maxHistory) * index;
+                const y = bgCanvas.height - (bgCanvas.height * (force / maxValue));
+                bgCtx.lineTo(x, y);
+            });
+            
+            bgCtx.lineTo(bgCanvas.width, bgCanvas.height);
+            bgCtx.closePath();
+            bgCtx.fill();
+            
+            // Draw line
+            bgCtx.beginPath();
+            STATE.forceHistory.forEach((force, index) => {
+                const x = (bgCanvas.width / STATE.maxHistory) * index;
+                const y = bgCanvas.height - (bgCanvas.height * (force / maxValue));
+                
+                if (index === 0) {
+                    bgCtx.moveTo(x, y);
+                } else {
+                    bgCtx.lineTo(x, y);
+                }
+            });
+            bgCtx.stroke();
+
+            backgroundChartFrame = requestAnimationFrame(drawBackgroundChart);
+        }
+
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (STATE.forceHistory.length < 2) {
+                chartAnimationFrame = requestAnimationFrame(drawChart);
+                return;
+            }
+
+            const maxValue = Math.max(...STATE.forceHistory, 10);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = (canvas.height / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Force line
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            STATE.forceHistory.forEach((force, index) => {
+                const x = (canvas.width / STATE.maxHistory) * index;
+                const y = canvas.height - (canvas.height * (force / maxValue));
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+
+            // Current value indicator
+            if (STATE.forceHistory.length > 0) {
+                const lastX = (canvas.width / STATE.maxHistory) * (STATE.forceHistory.length - 1);
+                const lastY = canvas.height - (canvas.height * (STATE.currentForce / maxValue));
+                
+                ctx.fillStyle = '#10b981';
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Glow effect
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#10b981';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            chartAnimationFrame = requestAnimationFrame(drawChart);
+        }
+
+        // ========================================
+        // AUDIO & SPEECH
+        // ========================================
+        function playBeep(frequency, duration) {
+            if (!STATE.audioEnabled) return;
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration / 1000);
+                
+                showAudioIndicator();
+            } catch (error) {
+                console.log('Audio not available:', error);
+            }
+        }
+
+        function speak(text) {
+            if (!STATE.audioEnabled) return;
+            
+            try {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                window.speechSynthesis.speak(utterance);
+                showAudioIndicator();
+            } catch (error) {
+                console.log('Speech not available:', error);
+            }
+        }
+
+        function showAudioIndicator() {
+            const indicator = document.getElementById('audioIndicator');
+            indicator.classList.add('active');
+            setTimeout(() => {
+                indicator.classList.remove('active');
+            }, 1000);
+        }
+
+        // ========================================
+        // NAVIGATION
+        // ========================================
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Load tab content
+            if (tabName === 'history') {
+                renderSessionList();
+            } else if (tabName === 'stats') {
+                updateStats();
+            } else if (tabName === 'routines') {
+                renderRoutineList();
+            }
+        }
+
+        // ========================================
+        // TEST FUNCTIONS
+        // ========================================
+        function startTest(testType) {
+            if (!STATE.isConnected) {
+                alert('Please connect device first!');
+                return;
+            }
+
+            // Configure test modal
+            const modal = document.getElementById('testModal');
+            const title = document.getElementById('testModalTitle');
+            
+            switch(testType) {
+                case 'peak':
+                    title.textContent = 'Peak Force Test';
+                    document.getElementById('testDuration').value = 7;
+                    document.getElementById('testReps').value = 1;
+                    break;
+                case 'endurance':
+                    title.textContent = 'Endurance Test';
+                    document.getElementById('testDuration').value = 30;
+                    document.getElementById('testReps').value = 1;
+                    break;
+                case 'repeaters':
+                    title.textContent = 'Repeaters';
+                    document.getElementById('testDuration').value = 7;
+                    document.getElementById('testReps').value = 5;
+                    document.getElementById('testRest').value = 3;
+                    break;
+                case 'rfd':
+                    title.textContent = 'RFD Test';
+                    document.getElementById('testDuration').value = 5;
+                    document.getElementById('testReps').value = 3;
+                    break;
+                case 'critical':
+                    title.textContent = 'Critical Force';
+                    document.getElementById('testDuration').value = 180;
+                    document.getElementById('testReps').value = 1;
+                    break;
+                case 'failure':
+                    title.textContent = 'To Failure';
+                    document.getElementById('testDuration').value = 999;
+                    document.getElementById('testReps').value = 1;
+                    break;
+            }
+
+            STATE.testState = {
+                type: testType,
+                isRunning: false
+            };
+
+            modal.classList.add('active');
+        }
+
+        function closeTestModal() {
+            document.getElementById('testModal').classList.remove('active');
+            document.getElementById('testConfig').style.display = 'block';
+            document.getElementById('testRunning').style.display = 'none';
+            document.getElementById('testResults').style.display = 'none';
+            if (STATE.testState) {
+                STATE.testState.isRunning = false;
+            }
+        }
+
+        function runTest() {
+            // Hide config, show running
+            document.getElementById('testConfig').style.display = 'none';
+            document.getElementById('testRunning').style.display = 'block';
+            document.getElementById('testResults').style.display = 'none';
+
+            // Get test parameters
+            const duration = parseInt(document.getElementById('testDuration').value);
+            const reps = parseInt(document.getElementById('testReps').value);
+            const rest = parseInt(document.getElementById('testRest').value);
+            const hand = document.getElementById('testHand').value;
+
+            // Show hand indicator if needed
+            const handIndicator = document.getElementById('handIndicator');
+            if (hand !== 'both') {
+                handIndicator.style.display = 'block';
+            } else {
+                handIndicator.style.display = 'block'; // Show for both too
+            }
+
+            STATE.testState = {
+                ...STATE.testState,
+                isRunning: true,
+                duration: duration,
+                reps: reps,
+                rest: rest,
+                hand: hand,
+                currentRep: 1,
+                phase: 'countdown', // countdown, work_left, rest_between_hands, work_right, rest, complete
+                currentHand: 'left', // Track which hand in 'both' mode
+                timeRemaining: 3, // 3 second countdown
+                repPeak: 0,
+                leftRepPeak: 0,
+                rightRepPeak: 0,
+                bestPeak: 0,
+                totalWork: 0,
+                startTime: Date.now(),
+                leftHandPeaks: [],
+                rightHandPeaks: []
+            };
+
+            speak('Get ready');
+            playBeep(800, 200);
+
+            // Start test loop
+            STATE.testState.interval = setInterval(updateTest, 100);
+        }
+
+        function updateTest() {
+            if (!STATE.testState.isRunning) return;
+
+            const test = STATE.testState;
+            test.timeRemaining -= 0.1;
+
+            // Phase transitions
+            if (test.timeRemaining <= 0) {
+                if (test.phase === 'countdown') {
+                    // Start work phase
+                    if (test.hand === 'both') {
+                        test.phase = 'work_left';
+                        test.currentHand = 'left';
+                        test.leftRepPeak = 0;
+                        speak('Left hand, Pull!');
+                    } else if (test.hand === 'left') {
+                        test.phase = 'work';
+                        test.repPeak = 0;
+                        speak('Left hand, Pull!');
+                    } else {
+                        test.phase = 'work';
+                        test.repPeak = 0;
+                        speak('Right hand, Pull!');
+                    }
+                    test.timeRemaining = test.duration;
+                    playBeep(1200, 200);
+                    
+                } else if (test.phase === 'work_left') {
+                    // Left hand done in 'both' mode, rest before right hand
+                    if (test.leftRepPeak > test.bestPeak) {
+                        test.bestPeak = test.leftRepPeak;
+                    }
+                    test.leftHandPeaks.push(test.leftRepPeak);
+                    test.totalWork += test.duration;
+                    
+                    test.phase = 'rest_between_hands';
+                    test.timeRemaining = 5; // 5 second rest between hands
+                    speak('Rest');
+                    playBeep(600, 200);
+                    
+                } else if (test.phase === 'rest_between_hands') {
+                    // Start right hand in 'both' mode
+                    test.phase = 'work_right';
+                    test.currentHand = 'right';
+                    test.rightRepPeak = 0;
+                    test.timeRemaining = test.duration;
+                    speak('Right hand, Pull!');
+                    playBeep(1200, 200);
+                    
+                } else if (test.phase === 'work_right') {
+                    // Right hand done in 'both' mode
+                    if (test.rightRepPeak > test.bestPeak) {
+                        test.bestPeak = test.rightRepPeak;
+                    }
+                    test.rightHandPeaks.push(test.rightRepPeak);
+                    test.totalWork += test.duration;
+                    
+                    if (test.currentRep < test.reps) {
+                        // Start rest phase before next rep
+                        test.phase = 'rest';
+                        test.timeRemaining = test.rest;
+                        speak('Rest');
+                        playBeep(600, 200);
+                    } else {
+                        // Test complete
+                        finishTest();
+                        return;
+                    }
+                    
+                } else if (test.phase === 'work') {
+                    // Single hand mode (left or right only) work complete
+                    if (test.repPeak > test.bestPeak) {
+                        test.bestPeak = test.repPeak;
+                    }
+                    
+                    if (test.hand === 'left') {
+                        test.leftHandPeaks.push(test.repPeak);
+                    } else {
+                        test.rightHandPeaks.push(test.repPeak);
+                    }
+                    
+                    test.totalWork += test.duration;
+                    
+                    if (test.currentRep < test.reps) {
+                        // Start rest phase
+                        test.phase = 'rest';
+                        test.timeRemaining = test.rest;
+                        speak('Rest');
+                        playBeep(600, 200);
+                    } else {
+                        // Test complete
+                        finishTest();
+                        return;
+                    }
+                    
+                } else if (test.phase === 'rest') {
+                    // Start next rep
+                    test.currentRep++;
+                    
+                    if (test.hand === 'both') {
+                        test.phase = 'work_left';
+                        test.currentHand = 'left';
+                        test.leftRepPeak = 0;
+                        speak(`Rep ${test.currentRep}, Left hand`);
+                    } else if (test.hand === 'left') {
+                        test.phase = 'work';
+                        test.repPeak = 0;
+                        speak(`Rep ${test.currentRep}, Left hand`);
+                    } else {
+                        test.phase = 'work';
+                        test.repPeak = 0;
+                        speak(`Rep ${test.currentRep}, Right hand`);
+                    }
+                    test.timeRemaining = test.duration;
+                    playBeep(1200, 200);
+                }
+            }
+
+            // Update peak during work phases
+            if (test.phase === 'work_left' && STATE.currentForce > test.leftRepPeak) {
+                test.leftRepPeak = STATE.currentForce;
+            } else if (test.phase === 'work_right' && STATE.currentForce > test.rightRepPeak) {
+                test.rightRepPeak = STATE.currentForce;
+            } else if (test.phase === 'work' && STATE.currentForce > test.repPeak) {
+                test.repPeak = STATE.currentForce;
+            }
+
+            updateTestDisplay();
+        }
+
+        function updateTestDisplay() {
+            const test = STATE.testState;
+            
+            // Update instruction
+            const instruction = document.getElementById('testInstruction');
+            if (test.phase === 'countdown') {
+                instruction.textContent = 'Get Ready...';
+            } else if (test.phase === 'work_left' || test.phase === 'work_right' || test.phase === 'work') {
+                instruction.textContent = '💪 PULL!';
+            } else if (test.phase === 'rest' || test.phase === 'rest_between_hands') {
+                instruction.textContent = '😌 Rest';
+            }
+
+            // Update hand indicator
+            const handIndicator = document.getElementById('handIndicator');
+            if (test.hand === 'both') {
+                if (test.phase === 'work_left') {
+                    handIndicator.innerHTML = '<span style="font-size: 64px;">👈 LEFT</span> | <span style="opacity: 0.3;">RIGHT 👉</span>';
+                } else if (test.phase === 'work_right') {
+                    handIndicator.innerHTML = '<span style="opacity: 0.3;">👈 LEFT</span> | <span style="font-size: 64px;">RIGHT 👉</span>';
+                } else {
+                    handIndicator.innerHTML = '<span style="opacity: 0.5;">👈 LEFT | RIGHT 👉</span>';
+                }
+            } else if (test.hand === 'left') {
+                handIndicator.innerHTML = '<span style="font-size: 64px;">👈 LEFT HAND</span>';
+            } else if (test.hand === 'right') {
+                handIndicator.innerHTML = '<span style="font-size: 64px;">RIGHT HAND 👉</span>';
+            }
+
+            // Update timer
+            const timer = document.getElementById('testTimer');
+            const minutes = Math.floor(test.timeRemaining / 60);
+            const seconds = Math.floor(test.timeRemaining % 60);
+            timer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            // Update rep counter
+            document.getElementById('repCounter').textContent = 
+                `Rep ${test.currentRep} / ${test.reps}`;
+
+            // Update force display and peak (depending on current hand/phase)
+            document.getElementById('testForceValue').textContent = STATE.currentForce.toFixed(1);
+            
+            let currentPeak = 0;
+            if (test.phase === 'work_left') {
+                currentPeak = test.leftRepPeak;
+            } else if (test.phase === 'work_right') {
+                currentPeak = test.rightRepPeak;
+            } else if (test.phase === 'work') {
+                currentPeak = test.repPeak;
+            }
+            
+            document.getElementById('testPeakValue').textContent = currentPeak.toFixed(1);
+            document.getElementById('testBestPeak').textContent = test.bestPeak.toFixed(1);
+        }
+
+        function stopTest() {
+            if (STATE.testState && STATE.testState.interval) {
+                clearInterval(STATE.testState.interval);
+            }
+            finishTest();
+        }
+
+        function finishTest() {
+            const test = STATE.testState;
+            
+            if (test.interval) {
+                clearInterval(test.interval);
+            }
+            
+            test.isRunning = false;
+            
+            // Calculate results
+            const totalTime = Math.round((Date.now() - test.startTime) / 1000);
+            const avgForce = test.totalWork > 0 ? (test.bestPeak * 0.7) : 0; // Simplified avg
+
+            // Calculate hand-specific stats
+            let leftPeak = 0, rightPeak = 0;
+            if (test.leftHandPeaks.length > 0) {
+                leftPeak = Math.max(...test.leftHandPeaks);
+            }
+            if (test.rightHandPeaks.length > 0) {
+                rightPeak = Math.max(...test.rightHandPeaks);
+            }
+
+            // Save session
+            saveSession({
+                date: new Date().toISOString(),
+                type: test.type,
+                peak: test.bestPeak,
+                avgForce: avgForce,
+                duration: totalTime,
+                reps: test.currentRep,
+                hand: test.hand,
+                leftPeak: leftPeak,
+                rightPeak: rightPeak
+            });
+
+            // Show results
+            document.getElementById('testRunning').style.display = 'none';
+            document.getElementById('testResults').style.display = 'block';
+            
+            document.getElementById('resultPeak').textContent = test.bestPeak.toFixed(1);
+            document.getElementById('resultAvg').textContent = avgForce.toFixed(1);
+            document.getElementById('resultTime').textContent = totalTime + 's';
+            document.getElementById('resultReps').textContent = test.currentRep;
+
+            // Show hand-specific results if applicable
+            if (leftPeak > 0 || rightPeak > 0) {
+                const handResults = document.createElement('div');
+                handResults.className = 'stats-grid';
+                handResults.style.marginTop = '20px';
+                handResults.innerHTML = `
+                    ${leftPeak > 0 ? `<div class="stat-card">
+                        <div class="stat-label">LEFT PEAK</div>
+                        <div class="stat-value">${leftPeak.toFixed(1)}</div>
+                    </div>` : ''}
+                    ${rightPeak > 0 ? `<div class="stat-card">
+                        <div class="stat-label">RIGHT PEAK</div>
+                        <div class="stat-value">${rightPeak.toFixed(1)}</div>
+                    </div>` : ''}
+                    ${(leftPeak > 0 && rightPeak > 0) ? `<div class="stat-card">
+                        <div class="stat-label">L/R RATIO</div>
+                        <div class="stat-value">${(leftPeak / rightPeak).toFixed(2)}</div>
+                    </div>` : ''}
+                `;
+                document.getElementById('testResults').querySelector('.stats-grid').after(handResults);
+            }
+
+            speak('Test complete!');
+            playBeep(1000, 100);
+            setTimeout(() => playBeep(1200, 100), 150);
+            setTimeout(() => playBeep(1400, 100), 300);
+        }
+
+        // ========================================
+        // SESSION MANAGEMENT
+        // ========================================
+        function saveSession(session) {
+            STATE.sessions.unshift(session);
+            
+            // Keep last 100 sessions
+            if (STATE.sessions.length > 100) {
+                STATE.sessions = STATE.sessions.slice(0, 100);
+            }
+            
+            localStorage.setItem('sessions', JSON.stringify(STATE.sessions));
+            updateStats();
+        }
+
+        function loadSessions() {
+            const stored = localStorage.getItem('sessions');
+            if (stored) {
+                STATE.sessions = JSON.parse(stored);
+            }
+        }
+
+        function renderSessionList() {
+            const container = document.getElementById('sessionList');
+            
+            if (STATE.sessions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <div class="empty-state-text">No sessions yet. Start training!</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = STATE.sessions.map(session => {
+                const date = new Date(session.date);
+                const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                
+                let handInfo = '';
+                if (session.hand === 'both' && session.leftPeak && session.rightPeak) {
+                    handInfo = `<div style="margin-top: 5px; font-size: 12px;">
+                        👈 ${session.leftPeak.toFixed(1)} kg | 
+                        👉 ${session.rightPeak.toFixed(1)} kg
+                    </div>`;
+                } else if (session.hand === 'left') {
+                    handInfo = `<div style="margin-top: 5px; font-size: 12px;">👈 Left hand only</div>`;
+                } else if (session.hand === 'right') {
+                    handInfo = `<div style="margin-top: 5px; font-size: 12px;">👉 Right hand only</div>`;
+                }
+                
+                return `
+                    <div class="session-card">
+                        <div class="session-header">
+                            <div class="session-date">${dateStr}</div>
+                            <div class="session-type">${session.type}</div>
+                        </div>
+                        <div class="session-stats">
+                            <div>Peak: ${session.peak.toFixed(1)} kg</div>
+                            <div>Reps: ${session.reps || 1}</div>
+                            <div>Time: ${session.duration}s</div>
+                        </div>
+                        ${handInfo}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function exportCSV() {
+            if (STATE.sessions.length === 0) {
+                alert('No sessions to export!');
+                return;
+            }
+
+            let csv = 'Date,Type,Peak (kg),Avg Force (kg),Duration (s),Reps\n';
+            
+            STATE.sessions.forEach(session => {
+                csv += `${session.date},${session.type},${session.peak},${session.avgForce || 0},${session.duration},${session.reps || 1}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `climbmeter_sessions_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            playBeep(1200, 100);
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all session history?')) {
+                STATE.sessions = [];
+                localStorage.removeItem('sessions');
+                renderSessionList();
+                updateStats();
+                playBeep(800, 100);
+            }
+        }
+
+        // ========================================
+        // STATS
+        // ========================================
+        function updateStats() {
+            // All-time peak
+            const allTimePeak = STATE.sessions.reduce((max, s) => Math.max(max, s.peak), 0);
+            document.getElementById('allTimePeak').textContent = allTimePeak.toFixed(1);
+
+            // Total sessions
+            document.getElementById('totalSessions').textContent = STATE.sessions.length;
+
+            // This week
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const weekSessions = STATE.sessions.filter(s => new Date(s.date) > weekAgo).length;
+            document.getElementById('weekSessions').textContent = weekSessions;
+
+            // Average peak
+            const avgPeak = STATE.sessions.length > 0 
+                ? STATE.sessions.reduce((sum, s) => sum + s.peak, 0) / STATE.sessions.length
+                : 0;
+            document.getElementById('avgPeak').textContent = avgPeak.toFixed(1);
+
+            // Training streak
+            const streak = calculateStreak();
+            document.getElementById('streakValue').textContent = streak;
+        }
+
+        function calculateStreak() {
+            if (STATE.sessions.length === 0) return 0;
+
+            const dates = STATE.sessions.map(s => new Date(s.date).toDateString());
+            const uniqueDates = [...new Set(dates)].sort((a, b) => new Date(b) - new Date(a));
+
+            let streak = 0;
+            const today = new Date().toDateString();
+            let checkDate = new Date();
+
+            for (let i = 0; i < uniqueDates.length; i++) {
+                const sessionDate = checkDate.toDateString();
+                if (uniqueDates.includes(sessionDate)) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+
+            return streak;
+        }
+
+        // ========================================
+        // ROUTINES
+        // ========================================
+        function showRoutineModal() {
+            document.getElementById('routineModal').classList.add('active');
+        }
+
+        function closeRoutineModal() {
+            document.getElementById('routineModal').classList.remove('active');
+        }
+
+        function loadTemplate() {
+            const template = document.getElementById('routineTemplate').value;
+            // Template loading logic would go here
+            console.log('Load template:', template);
+        }
+
+        function addExercise() {
+            // Add exercise to routine
+            console.log('Add exercise');
+        }
+
+        function saveRoutine() {
+            const name = document.getElementById('routineName').value;
+            if (!name) {
+                alert('Please enter a routine name');
+                return;
+            }
+
+            // Save routine logic
+            STATE.routines.push({
+                name: name,
+                exercises: []
+            });
+
+            localStorage.setItem('routines', JSON.stringify(STATE.routines));
+            closeRoutineModal();
+            renderRoutineList();
+            playBeep(1200, 100);
+        }
+
+        function loadRoutines() {
+            const stored = localStorage.getItem('routines');
+            if (stored) {
+                STATE.routines = JSON.parse(stored);
+            }
+        }
+
+        function renderRoutineList() {
+            const container = document.getElementById('routineList');
+            
+            if (STATE.routines.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-text">No custom routines yet</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = STATE.routines.map(routine => `
+                <div class="session-card">
+                    <div class="session-header">
+                        <div style="font-size: 18px; font-weight: bold;">${routine.name}</div>
+                    </div>
+                    <div class="session-stats">
+                        <div>${routine.exercises.length} exercises</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ========================================
+        // SETTINGS
+        // ========================================
+        function saveSettings() {
+            STATE.bodyWeight = parseFloat(document.getElementById('bodyWeight').value) || 70;
+            STATE.audioEnabled = document.getElementById('audioEnabled').value === 'true';
+            STATE.autoStartThreshold = parseFloat(document.getElementById('autoStartThreshold').value) || 2;
+
+            localStorage.setItem('settings', JSON.stringify({
+                bodyWeight: STATE.bodyWeight,
+                audioEnabled: STATE.audioEnabled,
+                autoStartThreshold: STATE.autoStartThreshold
+            }));
+
+            playBeep(1000, 50);
+        }
+
+        function loadSettings() {
+            const stored = localStorage.getItem('settings');
+            if (stored) {
+                const settings = JSON.parse(stored);
+                STATE.bodyWeight = settings.bodyWeight || 70;
+                STATE.audioEnabled = settings.audioEnabled !== false;
+                STATE.autoStartThreshold = settings.autoStartThreshold || 2;
+
+                document.getElementById('bodyWeight').value = STATE.bodyWeight;
+                document.getElementById('audioEnabled').value = STATE.audioEnabled.toString();
+                document.getElementById('autoStartThreshold').value = STATE.autoStartThreshold;
+            }
+        }
+
+        // ========================================
+        // PWA INSTALL
+        // ========================================
+        let deferredPrompt;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.add('active');
+        });
+
+        function checkInstallPrompt() {
+            const dismissed = localStorage.getItem('installDismissed');
+            if (dismissed) {
+                document.getElementById('installPrompt').classList.remove('active');
+            }
+        }
+
+        async function installApp() {
+            if (!deferredPrompt) {
+                alert('Install prompt not available');
+                return;
+            }
+
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('App installed');
+            }
+            
+            deferredPrompt = null;
+            document.getElementById('installPrompt').classList.remove('active');
+        }
+
+        function dismissInstall() {
+            document.getElementById('installPrompt').classList.remove('active');
+            localStorage.setItem('installDismissed', 'true');
+        }
+
+        // ========================================
+        // UTILITY
+        // ========================================
+        
+        // Check browser support
+        if (!navigator.bluetooth) {
+            alert('⚠️ Web Bluetooth not supported!\n\nPlease use Chrome browser on Windows, Mac, or Android.');
+            document.getElementById('connectBtn').disabled = true;
+        }
+
+        console.log('✅ ClimbMeter Pro initialized');
+        console.log('📱 Ready for device connection');
+    </script>
+</body>
+</html>

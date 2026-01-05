@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClimbMeter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 16px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .force-display {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .force-value {
+            font-size: 80px;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .force-unit {
+            font-size: 28px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .peak-display {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .peak-label {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 10px;
+        }
+
+        .peak-value {
+            font-size: 40px;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            height: 200px;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        button {
+            padding: 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .btn-connect {
+            background: #44ff44;
+            color: #222;
+        }
+
+        .btn-connect.connected {
+            background: #ff4444;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧗 ClimbMeter</h1>
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </div>
+
+    <div class="force-display">
+        <div class="force-value" id="forceValue">0.0</div>
+        <div class="force-unit">kg</div>
+    </div>
+
+    <div class="peak-display">
+        <div class="peak-label">PEAK FORCE</div>
+        <div class="peak-value" id="peakValue">0.0 kg</div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="forceChart"></canvas>
+    </div>
+
+    <div class="controls">
+        <button class="btn-connect" id="connectBtn" onclick="toggleConnection()">
+            Connect Device
+        </button>
+        <button class="btn-secondary" id="resetBtn" onclick="resetPeak()" disabled>
+            Reset Peak
+        </button>
+    </div>
+
+    <div class="info">
+        <strong>📱 Instructions:</strong><br>
+        1. Make sure your TTGO board is running the BLE code<br>
+        2. Click "Connect Device"<br>
+        3. Select "ClimbMeter" from the list<br>
+        4. Watch the force readings!<br>
+        <br>
+        ⚠️ Must use <strong>Chrome</strong> browser (not Firefox/Safari)
+    </div>
+
+    <script>
+        // BLE Configuration
+        const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+        let device = null;
+        let characteristic = null;
+        let isConnected = false;
+
+        // Data
+        let currentForce = 0;
+        let peakForce = 0;
+        let forceHistory = [];
+        const MAX_HISTORY = 80;
+
+        // Chart
+        const canvas = document.getElementById('forceChart');
+        const ctx = canvas.getContext('2d');
+        let animationFrame;
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // BLE Functions
+        async function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                await connect();
+            }
+        }
+
+        async function connect() {
+            try {
+                console.log('🔍 Looking for Bluetooth devices...');
+                
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'ClimbMeter' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                console.log('🔌 Connecting...');
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleForceData);
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                updateConnectionStatus(true);
+                console.log('✅ Connected!');
+
+            } catch (error) {
+                console.error('❌ Connection failed:', error);
+                alert('Failed to connect: ' + error.message);
+            }
+        }
+
+        function disconnect() {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+            updateConnectionStatus(false);
+        }
+
+        function onDisconnected() {
+            console.log('Device disconnected');
+            updateConnectionStatus(false);
+        }
+
+        function handleForceData(event) {
+            const value = event.target.value;
+            const forceArray = new Float32Array(value.buffer);
+            
+            currentForce = forceArray[0];
+            peakForce = forceArray[1];
+
+            updateDisplay();
+
+            forceHistory.push(currentForce);
+            if (forceHistory.length > MAX_HISTORY) {
+                forceHistory.shift();
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('forceValue').textContent = currentForce.toFixed(1);
+            document.getElementById('peakValue').textContent = peakForce.toFixed(1) + ' kg';
+        }
+
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const resetBtn = document.getElementById('resetBtn');
+
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                connectBtn.textContent = 'Disconnect';
+                connectBtn.classList.add('connected');
+                resetBtn.disabled = false;
+                startChart();
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+                connectBtn.textContent = 'Connect Device';
+                connectBtn.classList.remove('connected');
+                resetBtn.disabled = true;
+                stopChart();
+                
+                currentForce = 0;
+                peakForce = 0;
+                forceHistory = [];
+                updateDisplay();
+            }
+        }
+
+        function resetPeak() {
+            peakForce = 0;
+            updateDisplay();
+        }
+
+        // Chart
+        function startChart() {
+            if (!animationFrame) {
+                animationFrame = requestAnimationFrame(drawChart);
+            }
+        }
+
+        function stopChart() {
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+                animationFrame = null;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (forceHistory.length < 2) {
+                animationFrame = requestAnimationFrame(drawChart);
+                return;
+            }
+
+            const maxValue = Math.max(...forceHistory, 10);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = (canvas.height / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Force line
+            ctx.strokeStyle = '#44ff44';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            forceHistory.forEach((force, index) => {
+                const x = (canvas.width / MAX_HISTORY) * index;
+                const y = canvas.height - (canvas.height * (force / maxValue));
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+
+            // Current value dot
+            if (forceHistory.length > 0) {
+                const lastX = canvas.width - 5;
+                const lastY = canvas.height - (canvas.height * (currentForce / maxValue));
+                
+                ctx.fillStyle = '#44ff44';
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            animationFrame = requestAnimationFrame(drawChart);
+        }
+
+        // Check browser support
+        if (!navigator.bluetooth) {
+            alert('⚠️ Web Bluetooth not supported!\n\nPlease use Chrome browser on Windows, Mac, or Android.');
+            document.getElementById('connectBtn').disabled = true;
+        }
+
+        console.log('✅ App ready! Click Connect Device to start.');
+    </script>
+</body>
+</html>
